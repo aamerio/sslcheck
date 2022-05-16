@@ -26,16 +26,24 @@ def certificationInfo(hostname):
     return cert
 
 
-def expiringInfo(domains_list):
+def certificationAWSInfo(acm_client, certificate_arn):
+    cert = acm_client.describe_certificate(
+        CertificateArn=certificate_arn)
+    dateCertificateExpire =cert['Certificate']['NotAfter']
+    return dateCertificateExpire
+
+def expiringInfo(domains, env):
     listdate = {"valid": [], "30days": [], "expired": [], "error": []}
-    with open(domains_list) as f:
-        domains = f.readlines()
     for domain in domains:
         if domain != "":
             domain = domain.replace("\n", "")
-            cert = certificationInfo(domain)
-            dateCertificateExpire = parse(
-                cert['notAfter']).replace(tzinfo=pytz.utc)
+            if env['name'] == 'AWS':
+                dateCertificateExpire = certificationAWSInfo(
+                    env['obj'], domain)
+            else:
+                cert = certificationInfo(domain)
+                dateCertificateExpire = parse(
+                    cert['notAfter']).replace(tzinfo=pytz.utc)
             today = datetime.now().replace(tzinfo=pytz.utc)
             thirtyDaysAgo = (today + timedelta(-30)).replace(tzinfo=pytz.utc)
             if dateCertificateExpire > thirtyDaysAgo:
@@ -72,11 +80,20 @@ if __name__ == "__main__":
                        region_name=os.getenv("AWS_REGION"),
                        aws_access_key_id=os.getenv("AWS_KEY_ID"),
                        aws_secret_access_key= os.getenv("AWS_SECRET"))
-
-    domains_list = f"{os.getcwd()}/domains.list"
-    result = expiringInfo(domains_list)
-    body = analyzeInfo(result)
-    if len(body) > 0:
-        snsSendMessage(sns, sns_topic_arn, body)
-    else:
-        snsSendMessage(sns, sns_topic_arn, "Nessun certificato da rinnovare")
+    acm = boto3.client("acm",
+                       region_name=os.getenv("AWS_REGION"),
+                       aws_access_key_id=os.getenv("AWS_KEY_ID"),
+                       aws_secret_access_key=os.getenv("AWS_SECRET"))
+    domains = ["arn:aws:acm:eu-west-1:038950226408:certificate/811cda2e-0850-4554-ab4b-9ff67826ede7"]
+    env = {"name":'AWS', "obj": acm}
+    result = expiringInfo(domains, env)
+    print(result)
+#    domains_list = f"{os.getcwd()}/domains.list"
+#    with open(domains_list) as f:
+#       domains = f.readlines()
+#    result = expiringInfo(domains_list)
+#    body = analyzeInfo(result)
+#    if len(body) > 0:
+#        snsSendMessage(sns, sns_topic_arn, body)
+#    else:
+#        snsSendMessage(sns, sns_topic_arn, "Nessun certificato da rinnovare")
