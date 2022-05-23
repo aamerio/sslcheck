@@ -7,9 +7,6 @@ from dateutil.parser import parse
 from datetime import datetime, timedelta
 import pytz
 import boto3
-import texttable
-from snswrapper import SnsWrapper
-
 
 load_dotenv()
 
